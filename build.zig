@@ -4,31 +4,35 @@ pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const lib = b.addStaticLibrary(.{
+    const lib = b.addLibrary(.{
+        .linkage = .static,
         .name = "xml2",
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
     });
-    lib.linkLibC();
 
-    lib.addIncludePath(.{ .path = "upstream/include" });
-    lib.addIncludePath(.{ .path = "override/include" });
-    if (target.isWindows()) {
-        lib.addIncludePath(.{ .path = "override/config/win32" });
+    lib.addIncludePath(b.path("upstream/include"));
+    lib.addIncludePath(b.path("override/include"));
+
+    const is_windows = target.result.os.tag == .windows;
+    if (is_windows) {
+        lib.addIncludePath(b.path("override/config/win32"));
         lib.linkSystemLibrary("ws2_32");
     } else {
-        lib.addIncludePath(.{ .path = "override/config/posix" });
+        lib.addIncludePath(b.path("override/config/posix"));
     }
 
-    var flags = std.ArrayList([]const u8).init(b.allocator);
-    defer flags.deinit();
-    try flags.appendSlice(&.{
+    var flags: std.ArrayList([]const u8) = .empty;
+    defer flags.deinit(b.allocator);
+    try flags.appendSlice(b.allocator, &.{
         // Version info, hardcoded
         comptime "-DLIBXML_VERSION=" ++ Version.number(),
         comptime "-DLIBXML_VERSION_STRING=" ++ Version.string(),
         "-DLIBXML_VERSION_EXTRA=\"\"",
         comptime "-DLIBXML_DOTTED_VERSION=" ++ Version.dottedString(),
-
         // These might now always be true (particularly Windows) but for
         // now we just set them all. We should do some detection later.
         "-DSEND_ARG2_CAST=",
@@ -40,8 +44,8 @@ pub fn build(b: *std.Build) !void {
         "-DLIBXML_AUTOMATA_ENABLED=1",
         "-DWITHOUT_TRIO=1",
     });
-    if (!target.isWindows()) {
-        try flags.appendSlice(&.{
+    if (!is_windows) {
+        try flags.appendSlice(b.allocator, &.{
             "-DHAVE_ARPA_INET_H=1",
             "-DHAVE_ARPA_NAMESER_H=1",
             "-DHAVE_DL_H=1",
@@ -64,37 +68,40 @@ pub fn build(b: *std.Build) !void {
     // it to the `LIBXML_{field}_ENABLED` C define where field is uppercased.
     inline for (std.meta.fields(Options)) |field| {
         const opt = b.option(bool, field.name, "Configure flag") orelse
-            @as(*const bool, @ptrCast(field.default_value.?)).*;
+            field.defaultValue().?;
         if (opt) {
             var nameBuf: [32]u8 = undefined;
             const name = std.ascii.upperString(&nameBuf, field.name);
             const define = try std.fmt.allocPrint(b.allocator, "-DLIBXML_{s}_ENABLED=1", .{name});
-            try flags.append(define);
+            try flags.append(b.allocator, define);
 
             if (std.mem.eql(u8, field.name, "history")) {
-                try flags.appendSlice(&.{
+                try flags.appendSlice(b.allocator, &.{
                     "-DHAVE_LIBHISTORY=1",
                     "-DHAVE_LIBREADLINE=1",
                 });
             }
             if (std.mem.eql(u8, field.name, "mem_debug")) {
-                try flags.append("-DDEBUG_MEMORY_LOCATION=1");
+                try flags.append(b.allocator, "-DDEBUG_MEMORY_LOCATION=1");
             }
             if (std.mem.eql(u8, field.name, "regexp")) {
-                try flags.append("-DLIBXML_UNICODE_ENABLED=1");
+                try flags.append(b.allocator, "-DLIBXML_UNICODE_ENABLED=1");
             }
             if (std.mem.eql(u8, field.name, "run_debug")) {
-                try flags.append("-DLIBXML_DEBUG_RUNTIME=1");
+                try flags.append(b.allocator, "-DLIBXML_DEBUG_RUNTIME=1");
             }
             if (std.mem.eql(u8, field.name, "thread")) {
-                try flags.append("-DHAVE_LIBPTHREAD=1");
+                try flags.append(b.allocator, "-DHAVE_LIBPTHREAD=1");
             }
         }
     }
 
-    lib.addCSourceFiles(srcs, flags.items);
-    lib.installHeader("override/include/libxml/xmlversion.h", "libxml/xmlversion.h");
-    lib.installHeadersDirectory("upstream/include/libxml", "libxml");
+    lib.addCSourceFiles(.{
+        .files = srcs,
+        .flags = flags.items,
+    });
+    lib.installHeader(b.path("override/include/libxml/xmlversion.h"), "libxml/xmlversion.h");
+    lib.installHeadersDirectory(b.path("upstream/include/libxml"), "libxml", .{});
 
     b.installArtifact(lib);
 }
