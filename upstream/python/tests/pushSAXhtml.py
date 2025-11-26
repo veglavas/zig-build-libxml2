@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import sys
+import setup_test
 import libxml2
 
 # Memory debug specific
@@ -49,8 +50,7 @@ chunk = "ar</foo>"
 ctxt.htmlParseChunk(chunk, len(chunk), 1)
 ctxt=None
 
-reference = """startDocument:startElement html None:startElement body None:startElement foo {'url': 'tst'}:error: Tag foo invalid
-:characters: bar:endElement foo:endElement body:endElement html:endDocument:"""
+reference = """startDocument:startElement html None:startElement body None:startElement foo {'url': 'tst'}:characters: bar:endElement foo:endElement body:endElement html:endDocument:"""
 if log != reference:
     print("Error got: %s" % log)
     print("Exprected: %s" % reference)

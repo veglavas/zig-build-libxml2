@@ -63,6 +63,11 @@ pub fn build(b: *std.Build) !void {
             "-DHAVE_SYS_TYPES_H=1",
         });
     }
+    // TODO: See if this is a good approach once you have learned more.
+    const sysconfdir = b.option([]const u8, "sysconfdir", "System configuration directory") orelse
+        if (is_windows) "" else "/etc";
+    const sysconfdir_flag = try std.fmt.allocPrint(b.allocator, "-DXML_SYSCONFDIR=\"{s}\"", .{sysconfdir});
+    try flags.append(b.allocator, sysconfdir_flag);
 
     // Enable our `./configure` options. For bool-type fields we translate
     // it to the `LIBXML_{field}_ENABLED` C define where field is uppercased.
@@ -110,8 +115,8 @@ pub fn build(b: *std.Build) !void {
 /// in the future we will parse this from configure.ac.
 pub const Version = struct {
     pub const major = "2";
-    pub const minor = "9";
-    pub const micro = "12";
+    pub const minor = "16";
+    pub const micro = "0";
 
     pub fn number() []const u8 {
         return comptime major ++ "0" ++ minor ++ "0" ++ micro;
@@ -181,15 +186,12 @@ const srcs = &.{
     "upstream/hash.c",
     "upstream/HTMLparser.c",
     "upstream/HTMLtree.c",
-    "upstream/legacy.c",
     "upstream/list.c",
-    "upstream/nanoftp.c",
     "upstream/nanohttp.c",
     "upstream/parser.c",
     "upstream/parserInternals.c",
     "upstream/pattern.c",
     "upstream/relaxng.c",
-    "upstream/SAX.c",
     "upstream/SAX2.c",
     "upstream/schematron.c",
     "upstream/threads.c",
@@ -207,9 +209,7 @@ const srcs = &.{
     "upstream/xmlschemas.c",
     "upstream/xmlschemastypes.c",
     "upstream/xmlstring.c",
-    "upstream/xmlunicode.c",
     "upstream/xmlwriter.c",
     "upstream/xpath.c",
     "upstream/xpointer.c",
-    "upstream/xzlib.c",
 };

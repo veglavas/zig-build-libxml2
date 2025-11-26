@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import sys
+import setup_test
 import libxml2
 
 # Memory debug specific
@@ -19,7 +20,7 @@ if root.name != "doc":
     print("root.name failed")
     sys.exit(1)
 if valid != 1:
-    print("validity chec failed")
+    print("validity check failed")
     sys.exit(1)
 doc.freeDoc()
 
@@ -55,7 +56,7 @@ if root.name != "doc":
     print("root.name failed")
     sys.exit(1)
 if valid != 0:
-    print("validity chec failed")
+    print("validity check failed")
     sys.exit(1)
 doc.freeDoc()
 
